@@ -8,7 +8,7 @@ if (fs.existsSync("config.env")) {
 }
 
 const config = {
-	MONGODB_URI: process.env.MONGODB_URI || "", // put your mongo db url
+	MONGODB_URI: process.env.MONGODB_URI || "mongodb+srv://gsdvsbotnew:@ABHI903778cluster0.juvwkhf.mongodb.net/", // put your mongo db url
 };
 
 export default config;
