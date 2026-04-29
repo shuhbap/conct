@@ -1,24 +1,13 @@
 {
-  "name": "x-bot-md-pair",
-  "version": "3.0.1",
-  "description": "Web pair for every bot",
+  "name": "zae-pair-gist",
+  "version": "1.0.0",
   "main": "index.js",
-  "type": "module",
+  "type": "commonjs",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "pm2 start index.js --attach --name X-MD-PAIR",
-    "stop": "pm2 stop X-MD-PAIR"
+    "start": "node index.js"
   },
-  "author": "aswin Sparky",
   "dependencies": {
-    "@whiskeysockets/baileys": "latest",
-    "child_process": "^1.0.2",
-    "dotenv": "^17.4.2",
-    "express": "^4.18.2",
-    "fs-extra": "^10.0.0",
-    "mongoose": "^9.3.3",
-    "path": "latest",
-    "pino": "^8.1.0",
-    "pm2": "^6.0.14"
+    "axios": "^1.6.0",
+    "baileys": "latest"
   }
 }
