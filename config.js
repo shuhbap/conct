@@ -1,5 +1,5 @@
 module.exports = {
   PREFIX: ".",
-  OWNER_NUMBER: "YOUR_NUMBER",
+  OWNER_NUMBER: "919037780075",
   SESSION_FILE: "session.json"
 };
