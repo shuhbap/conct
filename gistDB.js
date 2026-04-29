@@ -1,7 +1,7 @@
 const axios = require("axios");
 
-const GIST_ID = "YOUR_GIST_ID";
-const TOKEN = "YOUR_GITHUB_TOKEN";
+const GIST_ID = "2363d4e727b565fb0f759d7e7d5b8ad8";
+const TOKEN = "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";
 const FILE_NAME = "session.json";
 
 async function loadFromGist() {
