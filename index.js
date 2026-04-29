@@ -1,4 +1,4 @@
-const { default: makeWASocket, useMultiFileAuthState } = require("baileys");
+const { default: makeWASocket, useMultiFileAuthState } = require("@whiskeysockets/baileys");
 const { getSession, setSession } = require("./database");
 const config = require("./config");
 
@@ -18,10 +18,10 @@ async function startBot() {
 
     const id = msg.key.remoteJid;
 
-    // Example: save session
+    // save session to gist
     await setSession(id, msg.message);
 
-    console.log("Message saved to Gist DB");
+    console.log("Message saved to Gist DB ✔");
   });
 }
 
