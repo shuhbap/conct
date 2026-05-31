@@ -1,31 +1,22 @@
 const { default: makeWASocket, Browsers, DisconnectReason } = require('@whiskeysockets/baileys');
-const { useMultiFileAuthState } = require('@whiskeysockets/baileys');
 const { Octokit } = require('@octokit/rest');
 const CryptoJS = require('crypto-js');
 const fs = require('fs');
 const path = require('path');
-const readline = require('readline');
 require('dotenv').config();
 
-// ========== CONFIGURATION ==========
+// ========== CONFIG (Read from Environment Variables) ==========
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'MyDefaultKey123!';
+const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
+const SESSION_ID = process.env.SESSION_ID;  // 👈 Key change!
+const PHONE_NUMBER = process.env.PHONE_NUMBER;
+const PAIRING_CODE = process.env.PAIRING_CODE;
+
 let GIST_ID = process.env.GIST_ID || null;
 
-const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-});
-
-const question = (text) => new Promise((resolve) => rl.question(text, resolve));
-
-// ========== GIST MANAGER CLASS ==========
+// ========== GIST MANAGER (Same as before) ==========
 class GistSessionManager {
     constructor() {
-        if (!GITHUB_TOKEN) {
-            console.error('❌ GITHUB_TOKEN not found in .env file!');
-            process.exit(1);
-        }
         this.octokit = new Octokit({ auth: GITHUB_TOKEN });
         this.gistId = GIST_ID;
     }
@@ -42,8 +33,7 @@ class GistSessionManager {
                     content: JSON.stringify({
                         userId: userId,
                         encryptedData: encrypted,
-                        createdAt: new Date().toISOString(),
-                        version: '1.0'
+                        createdAt: new Date().toISOString()
                     })
                 }
             };
@@ -51,25 +41,20 @@ class GistSessionManager {
             if (this.gistId) {
                 await this.octokit.gists.update({
                     gist_id: this.gistId,
-                    files: files,
-                    description: `WhatsApp Bot Sessions - ${new Date().toLocaleString()}`
+                    files: files
                 });
-                console.log(`✅ Session updated in Gist: ${this.gistId}`);
             } else {
                 const gist = await this.octokit.gists.create({
-                    description: 'WhatsApp Bot Authentication Sessions',
+                    description: 'WhatsApp Bot Sessions',
                     public: false,
                     files: files
                 });
                 this.gistId = gist.data.id;
-                console.log(`✅ New Gist created: https://gist.github.com/${this.gistId}`);
-                
-                // Save Gist ID to .env for next time
-                fs.appendFileSync('.env', `\nGIST_ID=${this.gistId}`);
+                console.log(`✅ Gist ID: ${this.gistId}`);
             }
             return true;
         } catch (error) {
-            console.error('❌ Gist save error:', error.message);
+            console.error('Gist save error:', error.message);
             return false;
         }
     }
@@ -77,43 +62,14 @@ class GistSessionManager {
     async loadSession(userId) {
         try {
             if (!this.gistId) return null;
-
             const gist = await this.octokit.gists.get({ gist_id: this.gistId });
             const file = gist.data.files[`session_${userId}.json`];
-            
             if (!file) return null;
-
             const data = JSON.parse(file.content);
             const decrypted = CryptoJS.AES.decrypt(data.encryptedData, ENCRYPTION_KEY);
-            const sessionData = JSON.parse(decrypted.toString(CryptoJS.enc.Utf8));
-            
-            return sessionData;
+            return JSON.parse(decrypted.toString(CryptoJS.enc.Utf8));
         } catch (error) {
-            console.error('❌ Gist load error:', error.message);
             return null;
-        }
-    }
-
-    async getAllSessions() {
-        try {
-            if (!this.gistId) return [];
-            
-            const gist = await this.octokit.gists.get({ gist_id: this.gistId });
-            const sessions = [];
-            
-            for (const [filename, content] of Object.entries(gist.data.files)) {
-                if (filename.startsWith('session_')) {
-                    const userId = filename.replace('session_', '').replace('.json', '');
-                    const data = JSON.parse(content.content);
-                    sessions.push({
-                        userId: userId,
-                        createdAt: data.createdAt
-                    });
-                }
-            }
-            return sessions;
-        } catch (error) {
-            return [];
         }
     }
 }
@@ -127,69 +83,44 @@ async function setupMessageHandler(sock, sessionId) {
             const sender = msg.key.remoteJid;
             
             if (text === 'ping') {
-                await sock.sendMessage(sender, { text: '🏓 Pong! Bot is active!' });
+                await sock.sendMessage(sender, { text: '🏓 Pong! Bot is alive!' });
             }
             else if (text === 'session') {
                 await sock.sendMessage(sender, { 
-                    text: `🔑 *Your Session ID:*\n\`${sessionId}\`\n\n📌 Save this ID to login later!` 
-                });
-            }
-            else if (text === 'help') {
-                await sock.sendMessage(sender, {
-                    text: `📱 *Available Commands:*\n\nping - Check bot status\nsession - Get your session ID\nhelp - Show this menu`
+                    text: `🔑 *Session ID:* \`${sessionId}\`` 
                 });
             }
         }
     });
 }
 
-// ========== MAIN FUNCTION ==========
+// ========== MAIN FUNCTION (Auto-start with env vars) ==========
 async function startBot() {
+    console.log('🤖 WhatsApp Bot Starting on Koyeb...');
+    
     const gistManager = new GistSessionManager();
     
-    console.log('\n🤖 WhatsApp Bot with Gist Session Storage\n');
-    console.log('═'.repeat(50));
-    console.log('1. 🔐 New Pairing (Save to Gist)');
-    console.log('2. 🔓 Load Existing Session');
-    console.log('3. 📋 List All Sessions');
-    console.log('═'.repeat(50));
-    
-    const choice = await question('\nSelect option (1/2/3): ');
-    
-    // Option 3: List sessions
-    if (choice === '3') {
-        const sessions = await gistManager.getAllSessions();
-        if (sessions.length === 0) {
-            console.log('\n📭 No sessions found in Gist');
-        } else {
-            console.log('\n📋 Sessions stored in Gist:');
-            sessions.forEach((session, i) => {
-                console.log(`   ${i+1}. ${session.userId} (${session.createdAt})`);
-            });
-        }
-        process.exit(0);
-    }
-    
-    // Option 2: Load existing session
-    if (choice === '2') {
-        const sessionId = await question('\n🔑 Enter your Session ID: ');
+    // Check if we have SESSION_ID in env
+    if (SESSION_ID && SESSION_ID !== 'your_session_id_here') {
+        console.log(`📂 Loading existing session: ${SESSION_ID}`);
         
-        console.log('\n⏳ Loading session from Gist...');
-        const sessionData = await gistManager.loadSession(sessionId);
+        const sessionData = await gistManager.loadSession(SESSION_ID);
         
         if (sessionData) {
-            const authPath = path.join(__dirname, 'restored_sessions', sessionId);
-            if (!fs.existsSync(authPath)) {
-                fs.mkdirSync(authPath, { recursive: true });
-            }
+            // Create in-memory auth (or temp file - Koyeb allows /tmp write)
+            const authPath = '/tmp/auth_info';
+            if (!fs.existsSync(authPath)) fs.mkdirSync(authPath, { recursive: true });
             
             fs.writeFileSync(path.join(authPath, 'creds.json'), sessionData.credentials);
             
+            const { useMultiFileAuthState } = require('@whiskeysockets/baileys');
             const { state, saveCreds } = await useMultiFileAuthState(authPath);
+            
             const sock = makeWASocket({
                 auth: state,
                 printQRInTerminal: false,
-                browser: Browsers.ubuntu('WhatsApp Bot')
+                browser: Browsers.ubuntu('WhatsApp Bot'),
+                version: [2, 3000, 1015901307]
             });
             
             sock.ev.on('creds.update', saveCreds);
@@ -198,47 +129,40 @@ async function startBot() {
                 const { connection, lastDisconnect } = update;
                 
                 if (connection === 'open') {
-                    console.log('\n✅ Session restored successfully!');
-                    console.log(`📱 Logged in as: ${sock.user.id}`);
-                    console.log('\n🎧 Bot is listening for messages...\n');
-                    await setupMessageHandler(sock, sessionId);
+                    console.log(`✅ Bot connected! User: ${sock.user.id}`);
+                    await setupMessageHandler(sock, SESSION_ID);
+                    console.log('🎧 Bot is running...');
+                    
+                    // Keep alive with periodic ping
+                    setInterval(() => {
+                        console.log('💓 Heartbeat - Bot alive');
+                    }, 300000); // Every 5 minutes
                 }
                 
                 if (connection === 'close') {
                     if (lastDisconnect?.error?.output?.statusCode !== 401) {
                         console.log('🔄 Reconnecting...');
-                        startBot();
+                        setTimeout(() => startBot(), 5000);
                     } else {
-                        console.log('❌ Session expired! Please pair again.');
-                        process.exit(0);
+                        console.log('❌ Session expired! Update SESSION_ID env var.');
                     }
                 }
             });
         } else {
-            console.log('\n❌ Invalid Session ID!');
-            process.exit(1);
+            console.log('❌ Invalid SESSION_ID! Check GIST_ID env var.');
         }
-        return;
-    }
-    
-    // Option 1: New pairing
-    if (choice === '1') {
-        const phoneNumber = await question('\n📱 Enter phone number (with country code, no +):\n> ');
-        const customCode = await question('\n🔑 Enter 8-char custom code (e.g., MYCODE123):\n> ');
+    } 
+    // New pairing (first time)
+    else if (PHONE_NUMBER && PAIRING_CODE) {
+        console.log(`📱 Starting new pairing for ${PHONE_NUMBER}...`);
         
-        if (customCode.length !== 8) {
-            console.log('\n❌ Custom code must be exactly 8 characters!');
-            process.exit(1);
-        }
+        const newSessionId = `SESSION_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
+        const authPath = '/tmp/auth_info';
         
-        const sessionId = `SESSION_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
-        const tempAuthPath = path.join(__dirname, 'temp_sessions', sessionId);
+        if (!fs.existsSync(authPath)) fs.mkdirSync(authPath, { recursive: true });
         
-        if (!fs.existsSync(tempAuthPath)) {
-            fs.mkdirSync(tempAuthPath, { recursive: true });
-        }
-        
-        const { state, saveCreds } = await useMultiFileAuthState(tempAuthPath);
+        const { useMultiFileAuthState } = require('@whiskeysockets/baileys');
+        const { state, saveCreds } = await useMultiFileAuthState(authPath);
         
         const sock = makeWASocket({
             auth: state,
@@ -250,64 +174,45 @@ async function startBot() {
         sock.ev.on('creds.update', async () => {
             await saveCreds();
             
-            try {
-                const credsFile = fs.readFileSync(path.join(tempAuthPath, 'creds.json'), 'utf-8');
-                await gistManager.saveSession(sessionId, {
-                    credentials: credsFile,
-                    sessionId: sessionId,
-                    phoneNumber: phoneNumber,
-                    createdAt: new Date().toISOString()
-                });
-                
-                // Send Session ID to WhatsApp
-                if (sock.user) {
-                    await sock.sendMessage(`${phoneNumber}@s.whatsapp.net`, {
-                        text: `✅ *Session Created Successfully!*\n\n🔑 *Your Session ID:*\n\`${sessionId}\`\n\n📌 *Save this ID!*\nUse it next time to login without pairing.\n\n🔄 To restore: Run bot and choose option 2\n\n⚠️ Keep this ID private!`
-                    });
-                    console.log('\n✅ Session ID sent to your WhatsApp!');
-                }
-            } catch (error) {
-                console.error('Failed to save to Gist:', error.message);
-            }
+            const credsFile = fs.readFileSync(path.join(authPath, 'creds.json'), 'utf-8');
+            await gistManager.saveSession(newSessionId, {
+                credentials: credsFile,
+                sessionId: newSessionId,
+                phoneNumber: PHONE_NUMBER
+            });
+            
+            console.log(`✅ Session saved to Gist!`);
+            console.log(`🔑 SESSION_ID=${newSessionId}`);
+            console.log(`💾 Save this in your Koyeb environment variables!`);
         });
         
         sock.ev.on('connection.update', async (update) => {
-            const { connection, lastDisconnect } = update;
+            const { connection } = update;
             
             if (connection === 'open') {
-                console.log('\n✅ Bot connected successfully!');
-                console.log(`📱 Logged in as: ${sock.user.id}`);
-                console.log(`🆔 Session ID: ${sessionId}`);
-                console.log(`💾 Saved to GitHub Gist`);
-                console.log('\n🎧 Bot is running! Send "ping" to test.\n');
-                await setupMessageHandler(sock, sessionId);
-            }
-            
-            if (connection === 'close') {
-                if (lastDisconnect?.error?.output?.statusCode !== 401) {
-                    console.log('🔄 Reconnecting...');
-                } else {
-                    console.log('❌ Connection closed.');
-                }
+                console.log(`✅ Bot connected! User: ${sock.user.id}`);
+                console.log(`🆔 New Session ID: ${newSessionId}`);
+                await setupMessageHandler(sock, newSessionId);
             }
         });
         
-        if (!sock.authState.creds.registered) {
-            const code = await sock.requestPairingCode(phoneNumber, customCode);
-            console.log('\n' + '═'.repeat(50));
-            console.log(`📲 *PAIRING CODE:* ${code.match(/.{1,4}/g).join('-')}`);
-            console.log('═'.repeat(50));
-            console.log('🔗 Link this code in WhatsApp:');
-            console.log('   Settings → Linked Devices → Link a Device\n');
-        }
+        // Request pairing code
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        const code = await sock.requestPairingCode(PHONE_NUMBER, PAIRING_CODE);
+        console.log(`\n📲 PAIRING CODE: ${code.match(/.{1,4}/g).join('-')}`);
+        console.log(`🔗 Enter this in WhatsApp: Settings → Linked Devices\n`);
+    }
+    else {
+        console.log('❌ Missing environment variables!');
+        console.log('For new pairing: set PHONE_NUMBER and PAIRING_CODE');
+        console.log('For existing session: set SESSION_ID and GIST_ID');
     }
 }
 
-// Handle graceful shutdown
+// Keep process alive
 process.on('SIGINT', () => {
-    console.log('\n\n👋 Bot stopped.');
+    console.log('👋 Bot stopped');
     process.exit(0);
 });
 
-// Start the bot
 startBot().catch(console.error);
