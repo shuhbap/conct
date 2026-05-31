@@ -1,11 +1,21 @@
 {
-  "name": "pair-bot",
+  "name": "whatsapp-bot-pairing",
   "version": "1.0.0",
-  "main": "index.js",
+  "description": "WhatsApp Bot with Custom Pairing Code System",
+  "main": "bot.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node bot.js",
+    "dev": "nodemon bot.js"
   },
+  "keywords": ["whatsapp", "bot", "baileys", "pairing-code"],
+  "author": "Sugank",
+  "license": "MIT",
   "dependencies": {
-    "@whiskeysockets/baileys": "latest"
+    "@whiskeysockets/baileys": "^6.6.0",
+    "qrcode-terminal": "^0.12.0",
+    "pino": "^8.15.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
   }
 }
