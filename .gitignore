@@ -1,7 +1,11 @@
 node_modules/
+.env
+temp_sessions/
+restored_sessions/
 auth_session/
 sessions/
-.env
 *.log
 .DS_Store
-pairing-code-bot/
+*.exe
+npm-debug.log
+yarn-error.log
