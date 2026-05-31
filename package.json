@@ -1,19 +1,22 @@
 {
-  "name": "whatsapp-bot-pairing",
+  "name": "whatsapp-gist-bot",
   "version": "1.0.0",
-  "description": "WhatsApp Bot with Custom Pairing Code System",
+  "description": "WhatsApp Bot with Gist-based Session Storage",
   "main": "bot.js",
   "scripts": {
     "start": "node bot.js",
     "dev": "nodemon bot.js"
   },
-  "keywords": ["whatsapp", "bot", "baileys", "pairing-code"],
+  "keywords": ["whatsapp", "bot", "baileys", "gist", "session"],
   "author": "Sugank",
   "license": "MIT",
   "dependencies": {
+    "@octokit/rest": "^20.0.2",
     "@whiskeysockets/baileys": "^6.6.0",
+    "crypto-js": "^4.2.0",
     "qrcode-terminal": "^0.12.0",
-    "pino": "^8.15.0"
+    "pino": "^8.15.0",
+    "dotenv": "^16.3.1"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
